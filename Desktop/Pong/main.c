@@ -5,6 +5,9 @@
 
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 480
+#define MOVE_UP 1
+#define MOVE_DOWN 0
+#define MOVE_STATIC -1
 
 struct {
     SDL_Rect *shape;
@@ -15,7 +18,8 @@ struct {
 } typedef PingRect;
 
 PingRect *createRect(int, int, int, int, double, double);
-void movePaddle(PingRect *, double);
+void movePaddleLeft(PingRect *, PingRect *);
+void movePaddleRight(PingRect *, int);
 void moveBall(PingRect *, double);
 bool touchingBorderX(PingRect *);
 bool touchingBorderY(PingRect *);
@@ -39,17 +43,36 @@ int main(int argc, char** argv){
 
     PingRect *leftPaddle = createRect(50, (SCREEN_HEIGHT - 80) / 2, 15, 80, 0, 200);
     PingRect *rightPaddle = createRect(SCREEN_WIDTH - 65, (SCREEN_HEIGHT - 80) / 2, 15, 80, 0, -200);
-    PingRect *ball = createRect((SCREEN_WIDTH - 15) / 2, (SCREEN_HEIGHT - 15) / 2, 15, 15, 400, 200);
+    PingRect *ball = createRect((SCREEN_WIDTH - 15) / 2, (SCREEN_HEIGHT - 15) / 2, 15, 15, 200, 200);
 
     Uint32 lastUpdate = SDL_GetTicks();
     SDL_Event event;
     bool running = true;
+    int direction = MOVE_STATIC;
 
     while(running) {
         while(SDL_PollEvent(&event)) {
             switch(event.type) {
                 case SDL_QUIT:
                     running = false;
+                    break;
+                case SDL_KEYDOWN:
+                    switch(event.key.keysym.sym) {
+                        case SDLK_UP:
+                            direction = MOVE_UP;
+                            break;
+                        case SDLK_DOWN:
+                            direction = MOVE_DOWN;
+                            break;
+                    }
+                    break;
+                case SDL_KEYUP:
+                    switch(event.key.keysym.sym) {
+                        case SDLK_UP:
+                        case SDLK_DOWN:
+                            direction = MOVE_STATIC;
+                            break;
+                    }
                     break;
             }
         }
@@ -66,8 +89,8 @@ int main(int argc, char** argv){
         Uint32 current = SDL_GetTicks();
         double dT = (current - lastUpdate) / 1000.0f; 
 
-        movePaddle(leftPaddle, dT);
-        movePaddle(rightPaddle, dT);
+        movePaddleLeft(leftPaddle, ball);
+        movePaddleRight(rightPaddle, direction);
         moveBall(ball, dT);
         checkColission(ball, leftPaddle);
         checkColission(ball, rightPaddle);
@@ -100,17 +123,25 @@ PingRect *createRect(int x, int y, int w, int h, double vx, double vy) {
     return rect;
 }
 
-void movePaddle(PingRect *rect, double time) {	
-	rect->motionY += rect->velocityY * time;
+void movePaddleLeft(PingRect *rect, PingRect *ball) {	
+	int centerY = ball->shape->y + (ball->shape->h / 2);
+    int posY = centerY - (rect->shape->h / 2);
 
-    if(abs(rect->motionY) >= 1) {
-        rect->shape->y += (long)rect->motionY;
-        rect->motionY = rect->motionY - (long)rect->motionY;
-    
-        if(touchingBorderY(rect)) {
-            rect->velocityY *= -1; 
-            rect->motionY *= -1;
-        }
+    if(touchingBorderY(rect)) {
+        if(posY < 0) posY = 0; 
+        if(posY + rect->shape->h > SCREEN_HEIGHT) posY = SCREEN_HEIGHT - rect->shape->h;
+    }
+    rect->shape->y = posY;
+}
+
+void movePaddleRight(PingRect *rect, int direction) {	
+    if(direction == MOVE_STATIC) return;
+	if(direction == MOVE_UP) rect->shape->y += -1;
+    if(direction == MOVE_DOWN) rect->shape->y += 1;
+
+    if(touchingBorderY(rect)) {
+        if(rect->shape->y < 0) rect->shape->y = 0; 
+        if(rect->shape->y + rect->shape->h > SCREEN_HEIGHT) rect->shape->y = SCREEN_HEIGHT - rect->shape->h;
     }
 }
 
@@ -145,8 +176,8 @@ bool touchingBorderX(PingRect *rect) {
 }
 
 bool touchingBorderY(PingRect *rect) {
-    if(rect->shape->y == 0) return true;
-    if(rect->shape->y + rect->shape->h == SCREEN_HEIGHT) return true;
+    if(rect->shape->y <= 0) return true;
+    if(rect->shape->y + rect->shape->h >= SCREEN_HEIGHT) return true;
     return false;
 }
 
