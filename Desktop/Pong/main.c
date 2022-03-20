@@ -22,11 +22,10 @@ struct {
     double velocityY;
     double motionX;
     double motionY;
-    double angle;
 } typedef PingBall;
 
 PingPaddle *createPaddle(int, int, int, int, double);
-PingBall *createBall(int, int, int, int, double, double, double, double);
+PingBall *createBall(int, int, int, int, double, double, double);
 void moveLeftPaddle(PingPaddle *, PingBall *);
 void moveRightPaddle(PingPaddle *, int, double);
 void moveBall(PingBall *, double);
@@ -52,7 +51,7 @@ int main(int argc, char** argv){
 
     PingPaddle *leftPaddle = createPaddle(50, (SCREEN_HEIGHT - 80) / 2, 15, 80, 200);
     PingPaddle *rightPaddle = createPaddle(SCREEN_WIDTH - 65, (SCREEN_HEIGHT - 80) / 2, 15, 80, 300);
-    PingBall *ball = createBall((SCREEN_WIDTH - 15) / 2, (SCREEN_HEIGHT - 15) / 2, 15, 15, 300, 300, 300, 45);
+    PingBall *ball = createBall((SCREEN_WIDTH - 15) / 2, (SCREEN_HEIGHT - 15) / 2, 15, 15, 400, 282, 282);
 
     Uint32 lastUpdate = SDL_GetTicks();
     SDL_Event event;
@@ -130,7 +129,7 @@ PingPaddle *createPaddle(int x, int y, int w, int h, double vy) {
     return paddle;
 }
 
-PingBall *createBall(int x, int y, int w, int h, double v, double vx, double vy, double a) {
+PingBall *createBall(int x, int y, int w, int h, double v, double vx, double vy) {
     PingBall *ball = (PingBall *) malloc(sizeof(PingBall));
     ball->shape = (SDL_Rect *) malloc(sizeof(SDL_Rect));
 
@@ -141,7 +140,6 @@ PingBall *createBall(int x, int y, int w, int h, double v, double vx, double vy,
     ball->velocity = v;
     ball->velocityX = vx;
     ball->velocityY = vy;
-    ball->angle = a;
     ball->motionX = 0;
     ball->motionY = 0;
 
@@ -220,11 +218,21 @@ bool checkColission(PingPaddle *paddle, PingBall *ball) {
     SDL_Rect intersection;
     if(SDL_IntersectRect(ball->shape, paddle->shape, &intersection)) {
         if(intersection.h >= ball->shape->h / 2) {
-            ball->velocityX *= -1;
+            double x = intersection.y + (intersection.h / 2) - paddle->shape->y;
+            // double m = M_PI / paddle->shape->h; 0° - 90°
+            double m = (5 * M_PI) / (6 * paddle->shape->h); // 0 - 75°
+            double a = abs(x * m - (5 * M_PI / 12));
+            
+            if(ball->velocityX > 0) ball->velocityX = ball->velocity * cos(a) * -1;
+            else ball->velocityX = ball->velocity * cos(a);
+            if(x < paddle->shape->h / 2) ball->velocityY = ball->velocity * sin(a) * -1;
+            else ball->velocityY = ball->velocity * sin(a);
+
             if(ball->motionX < 0) ball->motionX = intersection.w;
             else ball->motionX = intersection.w * -1;
             return true;
         }
+
         ball->velocityY *= -1;
         if(ball->motionY < 0) ball->motionY = intersection.h;
         else ball->motionY = intersection.h * -1;
